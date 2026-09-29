@@ -26,36 +26,36 @@ class Menu_displayer:
                     print(f"{self.AMARILLO}{i+1}. {self.menu_options[i]}{self.RESET}")
                 else:
                     print(f"{self.AMARILLO}- {self.menu_options[i]}{self.RESET}")
-            try:
-                entrada = input(f"{self.AZUL}$: {self.RESET}")
-                if rel_num:
-                    if self.entry_verication(entrada) != None: 
-                        run = False
-                        print(self.LIMPIAR_PANTALLA)
-                        print(self.SALIR_PANTALLA_ALT)
-                        return self.entry_verication(entrada)
-                else:
+            
+            entrada = input(f"{self.AZUL}$: {self.RESET}")
+            if rel_num:
+                if self.entry_verication(entrada) != None: 
+                    run = False
                     print(self.LIMPIAR_PANTALLA)
                     print(self.SALIR_PANTALLA_ALT)
-                    return entrada
-            except:
-                print("el valor debe ser un numero dentro de las opciones")
+                    return self.entry_verication(entrada)
+            else:
+                print(self.LIMPIAR_PANTALLA)
+                print(self.SALIR_PANTALLA_ALT)
+                return entrada
+    
     def entry_verication(self, entry: str):
             try:
                 int(entry)
-                if int(entry) <= 0:
-                    return None
+                if int(entry) <= 0 or int(entry) > len(self.menu_options):
+                    return print(f"{self.AMARILLO}Entrada invalida{self.RESET}")
                 return int(entry)
-            except:
-                return None
+            except ValueError:
+                print(f"{self.AMARILLO}Entrada invalida{self.RESET}")
 
 
 class Menus():
     def __init__(self):
         self.logic = logic.logic_main.logic_app()
         self.actual_menu = "init"
+    
     def init_menu(self):
-        rel = Menu_displayer("Bienvenido", ["inicar sesion","registrarse","salir"]).Menu_activate()
+        rel = Menu_displayer("Bienvenido", ["iniciar sesion","registrarse","salir"]).Menu_activate()
         match(rel):
             case 1:
                 self.logic.sesion_iniciada = self.sesion_menu()
@@ -69,6 +69,7 @@ class Menus():
                 if self.logic.sesion_iniciada:
                     self.actual_menu = "user"
                 else:
+                    Menu_displayer("Error al registrar usuario", ["Presiona [ENTER] para volver"]).Menu_activate(False, False)
                     self.actual_menu = "init"
             case 3:
                 self.actual_menu = "salir"
@@ -92,7 +93,10 @@ class Menus():
                 self.actual_menu = "user"
     
     def config_menu(self):
-        pass
+        rel = Menu_displayer("configuracion", ["volver"]).Menu_activate()
+        match rel:
+            case 1:
+                self.actual_menu = "user"
 
     def sesion_menu(self):
         nombre =  Menu_displayer("Pronto comenzara la mision ingresa tus datos", ["Nombre: "]).Menu_activate(False, False)
@@ -103,7 +107,7 @@ class Menus():
         misiones = self.logic.get_misions().copy()
         misiones.append("volver")
         rel = Menu_displayer("Misiones activas:", misiones).Menu_activate()
-        if rel >= len(misiones):
+        if rel == len(misiones):
             self.actual_menu = "user"
         else:
             self.logic.set_mision(rel - 1)
@@ -114,14 +118,15 @@ class Menus():
         options.append("volver")
         name =  Menu_displayer("Nueva mision", ["nombre"]).Menu_activate(False, False)
         type =  Menu_displayer("Selecciona el tipo de mision que quieres", options).Menu_activate()
-        if type >= len(options):
+        if type == len(options):
             self.actual_menu = "user"
+            return
         self.logic.append_mision(type, name)
         self.logic.set_mision(-1)
         self.actual_menu = "juego"
 
     def juego_menu(self):
-        rel = Menu_displayer(f"{self.logic.active_mision.nombre} \n -turno actual: {self.logic.active_mision.turno}",
+        rel = Menu_displayer(f"Mision: {self.logic.active_mision.nombre} \n- turno actual: {self.logic.active_mision.turno} | Estado: {self.logic.active_mision.estado}",
                        ["recursos","ejecutar simulacion","historial","volver"]).Menu_activate()
         match rel:
             case 1:
@@ -140,11 +145,52 @@ class Menus():
         comunicaciones = self.logic.active_mision.recursos.obtener("comunicaciones")
         oxigeno = self.logic.active_mision.recursos.obtener("oxigeno")
         aceptacion = self.logic.active_mision.recursos.obtener("aceptacion")
-        Menu_displayer("recursos: ", [f"Agua: {agua}",f"alimento: {alimento}",f"energia: {energia}",f"comunicaciones: {comunicaciones}",
-                                             f"oxigeno: {oxigeno}",f"aceptacion: {aceptacion}","Presiona [ENTER] para devovlerte"]).Menu_activate(False, False)
+        Menu_displayer("recursos: ", [f"Agua:           {agua} | estado: {self.logic.active_mision.recursos.estados()['agua']}",
+                                      f"alimento:       {alimento} | estado: {self.logic.active_mision.recursos.estados()['alimento']}",
+                                      f"energia:        {energia} | estado: {self.logic.active_mision.recursos.estados()['energia']}",
+                                      f"comunicaciones: {comunicaciones} | estado: {self.logic.active_mision.recursos.estados()['comunicaciones']}",
+                                      f"oxigeno:        {oxigeno} | estado: {self.logic.active_mision.recursos.estados()['oxigeno']}",
+                                      f"aceptacion:     {aceptacion} | estado: {self.logic.active_mision.recursos.estados()['aceptacion']}",
+                                      "Presiona [ENTER] para devolverte"]).Menu_activate(False, False)
         self.actual_menu = "juego"
+    """
     def execute_simulation_menu(self):
-        return Menu_displayer().Menu_activate("Simulation menu")
-    
+        if self.logic.get_event() == None:
+            self.logic.execute_simulation()
+            Menu_displayer("Simulation ejecutada", ["Presiona [ENTER] para Seguir"]).Menu_activate(False, False)
+            for event in self.logic.eventos:
+                while True:
+                    rel = Menu_displayer(f"evento: {event.name} \n {event.descripcion}",[opcion.title for opcion in event.opciones]).Menu_activate()
+                    match rel:
+                        case 1:
+                            self.logic.process_event(event.opciones[0])
+                            break
+                        case 2:
+                            self.logic.process_event(event.opciones[1])
+                            break
+            self.actual_menu = "juego"
+            return    
+        Menu_displayer("No has terminado los eventos", ["Presiona [ENTER] para devolverte"]).Menu_activate(False, False)
+        self.actual_menu = "juego"
+    """
+    def execute_simulation_menu(self):
+        self.logic.execute_simulation()
+        Menu_displayer("Simulation ejecutada", ["Presiona [ENTER] para Seguir"]).Menu_activate(False, False)
+        for indice, event in enumerate(self.logic.eventos):
+            while True:
+                rel = Menu_displayer(f"evento: {event.name} \n {event.descripcion}",[opcion.title for opcion in event.opciones]).Menu_activate()
+                match rel:
+                    case 1:
+                        self.logic.process_event(event.opciones[0], indice)
+                        break
+                    case 2:
+                        self.logic.process_event(event.opciones[1], indice)
+                        break
+        self.actual_menu = "juego"
+        self.logic.eventos.clear()
+        
     def historial_menu(self):
-        return Menu_displayer().Menu_activate("Historial menu")
+        rel = Menu_displayer("Historial menu", ["volver"]).Menu_activate(False, False)
+        match rel:
+            case 1:
+                self.actual_menu = "juego"

@@ -1,13 +1,17 @@
+from ast import List
 import random as rd
 from logic import usuarios as us
+from logic import eventos
+
 class logic_app:
     def __init__(self):
+        self.dificultad = 1
         self._sesion_iniciada = False
         self._users: us.Operador = []
-        self.eventos = []
+        self.eventos: List[eventos.Event] = []
         self.active_user: us.Operador = None
         self.active_mision = None
-
+        self.case_with_no_event = 1
     @property
     def sesion_iniciada(self):
         return self._sesion_iniciada
@@ -15,6 +19,7 @@ class logic_app:
     def cerrar_sesion(self):
         self._sesion_iniciada = False
         self.active_user = None
+
 
     @sesion_iniciada.setter
     def sesion_iniciada(self, credenciales):
@@ -25,9 +30,8 @@ class logic_app:
                 if u.verificate(password):
                     self.active_user = u
                     self._sesion_iniciada = True
-                else:
-                    return "contraseña no valida"
-        return "nombre de usuario no registrado"
+                    return
+        self._sesion_iniciada = False
 
     def registro(self, name, password):
         for i in self._users:
@@ -46,7 +50,6 @@ class logic_app:
         return [mision["nombre"] for mision in us.misiones_predefinidas]
     
     def append_mision(self, preset: int, name: str = None):
-        print(preset)
         if self.sesion_iniciada:
             mision_data = us.misiones_predefinidas[preset-1]
             mision = us.mision(name, mision_data["descripcion"], mision_data["nombre"])
@@ -54,11 +57,49 @@ class logic_app:
             self.active_user.misiones.append(mision)
     def set_mision(self, index: int):
         self.active_mision = self.active_user.misiones[index]
-        print(self.active_mision.nombre)
-        print(self.active_mision.turno)
 
+    def generate_event(self):
+        longitud = len(eventos.eventos)
+        for i in range(self.dificultad):
+            random_index = rd.randint(0, longitud - 1 + self.case_with_no_event)
+            if not random_index >= longitud:
+                evento = eventos.eventos[random_index]
+                self.eventos.append(evento)
+    
+    def get_event(self, index):
+        if len(self.eventos) > 0:
+            return self.eventos[index]
+        else:
+            return None
+    
+    def process_event(self, option, index):
+        evento = self.eventos[index]
+        if option in evento.opciones:
+            cambiar_recurso = self.active_mision.recursos.modificar
+        
+            for recurso, valor in evento.activate(option).items():
+                if recurso != "puntos":
+                    cambiar_recurso(recurso, valor)
+            self.active_mision.modify_puntuacion(option.consecuences["puntos"])
+            if option.is_correct == False:
+                self.active_mision.eventos_mal_seleccionado += 1
+            self.active_mision.eventos_procesados += 1
+            self.actualizar_estado()
 
-    def delete_mision(self, mision_name):
-        for mision in self.active_user.misiones:
-            if mision.name == mision_name:
-                pass
+    def execute_simulation(self):
+        if self.active_mision.estado == "FINALIZADA" or self.active_mision.estado == "AGOTADO":
+            return "partida finalizada"
+        if len(self.eventos) > 0:
+            return "aun hay eventos por responder"
+        if self.active_mision.turno == 20:
+            self.active_mision.estado = "FINALIZADA"
+            return "partida finalizada"
+        self.generate_event()
+        if self.active_mision.estado == "AGOTADO":
+            pass #generar reporte
+        self.active_mision.sources_turno()
+
+        self.active_mision.turno += 1
+    def actualizar_estado(self):
+        if self.active_mision.estado != "FINALIZADA":
+            self.active_mision.estado = self.active_mision.recursos.estado_general()

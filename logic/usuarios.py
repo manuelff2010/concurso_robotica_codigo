@@ -34,11 +34,26 @@ class mision():
         self.puntuacion = 0
         self.turno = 0
         self.eventos_procesados = 0
+        self.eventos_mal_seleccionado = 0
         self.historial = []
     
     def sources_init(self, recursoso_iniciales: dict):
         self.recursos = recursos.Recursos(recursoso_iniciales)
 
+    def modify_puntuacion(self,valor):
+        self.puntuacion + valor
+
+    def sources_turno(self):
+        recursos_per_tourn = {
+            "agua": 2,
+            "alimento": 2,
+            "energia": 3,
+            "comunicaciones": 3,
+            "oxigeno": 1,
+            "aceptacion": 1
+        }
+        for recurso, valor in recursos_per_tourn.items():
+            self.recursos.modificar(recurso, valor)
 misiones_predefinidas = [
     {
         "nombre": "Colapso en Distrito Norte",

@@ -210,3 +210,10 @@ MISIÓN ALEATORIA — rangos sugeridos para random.randint()
     comunicaciones: entre 20 y 90
     oxigeno:       entre 40 y 95
     aceptacion:    entre 30 y 80
+
+agua:           +2
+alimento:       +2
+energia:        +3
+comunicaciones: +3
+oxigeno:        +1
+aceptacion:     +1
