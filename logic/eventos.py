@@ -14,6 +14,8 @@ class Event():
            return option.consecuences
        return None
 
+
+
 eventos = [
     Event("Falla en la red energética",
           "Una alta demanda de energía provocó un sobrecalentamiento de las bobinas de los generadores, derritiendo el revestimiento y generando un corto catastrófico.",
