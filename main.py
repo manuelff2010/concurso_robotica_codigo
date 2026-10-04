@@ -18,9 +18,13 @@ class Terminal_app():
             "execute_simulation": self.menus.execute_simulation_menu,
             "historial": self.menus.historial_menu,
             "estadisticas": self.menus.estadisticas_menu,
-            "finalizar_mision": self.menus.finalizar_mision_menu
+            "finalizar_mision": self.menus.finalizar_mision_menu,
+            "top_globales": self.menus.top_globales_menu,
+            "modificar_privilegios": self.menus.modificar_privilegios_menu,
+            "eliminar_usuarios": self.menus.eliminar_usuarios_menu
         }
         self.init_loop()
+
     def init_loop(self):
         while self.game:
             for i in self.pantallas.keys():

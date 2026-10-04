@@ -1,9 +1,21 @@
 class Opcion():
-    def __init__(self, is_correct: bool, title: str, causa: tuple):
-       self.is_correct = is_correct
-       self.title = title
-       self.consecuences = causa
-        
+       def __init__(self, is_correct: bool, title: str, causa: tuple):
+              self.is_correct = is_correct
+              self.title = title
+              self.consecuences = causa
+       
+       def to_dict(self):
+              return {
+              "is_correct": self.is_correct,
+              "title": self.title,
+              "consecuences": self.consecuences
+              }
+
+       @classmethod
+       def from_dict(cls, data):
+              if not data: return None
+              return cls(data["is_correct"], data["title"], data["consecuences"])
+
 class Event():
     def __init__(self, name: str, description: str, opciones: list[Opcion]):
        self.name = name

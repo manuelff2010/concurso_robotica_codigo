@@ -2,16 +2,18 @@ from ast import List
 import random as rd
 from logic import usuarios as us
 from logic import eventos as ev
-from logic import misions as ms
+from logic import reportes as rp
 class logic_app:
     def __init__(self):
-        self.dificultad = 1
+        self.data_saver = rp.datas_saver()
         self._sesion_iniciada = False
-        self._users: us.Operador = []
+        self._users: us.Operador = self.data_saver.cargar_partida(us.Operador)
         self.eventos: List[ev.Event] = []
         self.active_user: us.Operador = None
         self.active_mision = None
         self.case_with_no_event = 1
+        self.turnos_por_mision = 5    
+        self.top_globales = []
 
     @property
     def sesion_iniciada(self):
@@ -19,8 +21,8 @@ class logic_app:
 
     def cerrar_sesion(self):
         self._sesion_iniciada = False
+        self.active_user.sesion_iniciada = False
         self.active_user = None
-
 
     @sesion_iniciada.setter
     def sesion_iniciada(self, credenciales):
@@ -34,39 +36,46 @@ class logic_app:
                     self.active_user.sesion_iniciada = True
                     return
         self._sesion_iniciada = False
-        self.active_user.sesion_iniciada = False
+
     def registro(self, name, password):
         for i in self._users:
             if i.name == name:
                 return "usuario ya registrado"
         new_user = us.Operador(name, password)
+        if len(self._users) == 0:
+            new_user.privilegios = "admin"
         self._users.append(new_user)
         self.active_user = new_user
         self._sesion_iniciada = True
         self.active_user.sesion_iniciada = True
+        self.data_saver.guardar_partida(self._users)
 
-    """
-    def get_misions(self):
-        if self.sesion_iniciada:
-            return [f"{mision.nombre}: {mision.type}" for mision in self.active_user.misiones]
-    
-    def get_preset_misions(self):
-        return [mision["nombre"] for mision in ms.misiones_predefinidas]
-    
-    def append_mision(self, preset: int, name: str = None):
-        if self.sesion_iniciada:
-            mision_data = ms.misiones_predefinidas[preset-1]
-            mision = ms.Mision(name, mision_data["descripcion"], mision_data["nombre"])
-            mision.sources_init(mision_data["recursos"])
-            self.active_user.misiones.append(mision)
-    """
+    def get_users(self):
+        return [f"{user.name}: {user.privilegios}" for user in self._users]
+
+    def delete_user(self, name):
+        for i in self._users:
+            if i.name == name:
+                self._users.remove(i)
+                self.data_saver.guardar_partida(self._users)
+                return "usuario eliminado"
+        return "usuario no encontrado"
+
+    def modify_privilegios(self, name, privilegios):
+        for i in self._users:
+            if i.name == name:
+                i.privilegios = privilegios
+                self.data_saver.guardar_partida(self._users)
+                return True
+        return False
+   
     def set_mision(self, index: int): 
         self.active_mision = self.active_user.misiones[index]
         self.active_mision.historial.append(f"mision {self.active_mision.nombre} abierta por {self.active_user.name}")
     
     def generate_event(self):
         longitud = len(ev.eventos)
-        for i in range(self.dificultad):
+        for i in range(self.active_mision.dificultad):
             random_index = rd.randint(0, longitud - 1 + self.case_with_no_event)
             if not random_index >= longitud:
                 evento = ev.eventos[random_index]
@@ -93,48 +102,52 @@ class logic_app:
             self.actualizar_estado()
             self.active_mision.historial.append(f"evento {evento.name} : {evento.descripcion}")
             self.active_mision.historial.append(f"{self.active_user.name} ha seleccionado la opcion \"{option.title}\", correcta: {option.is_correct}")
-            self.active_mision.historial.append(f"recursos: {self.active_mision.recursos.estados()}")
-            self.active_mision.historial.append(f"estado de la mision: {self.active_mision.estado}")
+            self.data_saver.guardar_partida(self._users)
   
     def execute_simulation(self):
         if self.active_mision.estado == "FINALIZADA" or self.active_mision.estado == "AGOTADO":
             return "partida finalizada"
-            #final mision
         if len(self.eventos) > 0:
+            self.data_saver.guardar_partida(self._users)
             return "aun hay eventos por responder"
-        if self.active_mision.turno == 20:
-            self.active_mision.estado = "FINALIZADA"
+        if self.active_mision.turno == self.turnos_por_mision:
+            self.active_mision.estado = "COMPLETADA"
+            self.active_mision.partida_finalizada = True
+            self.data_saver.guardar_partida(self._users)
+            return "partida finalizada"
+        if self.active_mision.recursos.estado_general() == "AGOTADO":
+            self.active_mision.estado = "FALLIDA"
+            self.active_mision.partida_finalizada = True
+            self.data_saver.guardar_partida(self._users)
             return "partida finalizada"
         self.generate_event()
         self.active_mision.sources_turno()
-
         self.active_mision.turno += 1
+        self.active_mision.historial.append(f"recursos: \n{self.active_mision.recursos.historial_data()}")
+        self.active_mision.historial.append(f"estado de la mision: {self.active_mision.estado}")
 
     def actualizar_estado(self):
-        if self.active_mision.estado != "FINALIZADA":
+        if not self.active_mision.partida_finalizada:
             self.active_mision.estado = self.active_mision.recursos.estado_general()
 
-    def estadisticas_mision(self):
-        mision = self.active_mision
-        mision.puntuacion
-        mision.type
-        mision.nombre
-        mision.descripcion
-        mision.turno
-        mision.eventos_procesados
-        mision.eventos_mal_seleccionado
-        eventos_bien = mision.eventos_procesados - mision.eventos_mal_seleccionado
-        return {
-                    "Eventos procesados": mision.eventos_procesados,
-                    "Decisiones correctas": eventos_bien,
-                    "Decisiones incorrectas": mision.eventos_mal_seleccionado,
-                    "Energia restante": mision.recursos.obtener("energia"),
-                    "Agua restante": mision.recursos.obtener("agua"),
-                    "Alimento restante": mision.recursos.obtener("alimento"),
-                    "Comunicaciones restantes": mision.recursos.obtener("comunicaciones"),
-                    "Oxigeno restante": mision.recursos.obtener("oxigeno"),
-                    "Aceptacion restante": mision.recursos.obtener("aceptacion"),
-                    "Puntuacion final": mision.puntuacion,
-                    "Indice de eficienccia": round((eventos_bien / mision.eventos_procesados) * 100, 2) if mision.eventos_procesados > 0 else 0,
-                    "Estado final": mision.estado #repaso
-                }
+    def eliminar_mision(self):
+        self.active_user.delete_mision(self.active_mision)
+        self.active_mision = None
+    
+    def generar_reporte(self):
+        estadisticas = "" 
+        for categoria, valor in self.active_mision.estadisticas_mision().items():
+            estadisticas += f"{categoria}: {valor}\n"
+        if self.active_mision != None:
+            rp.report(self.active_mision.nombre, self.active_mision.historial, estadisticas).write(self.active_user.name)
+
+    def top_globales_update(self):
+        ranking = []
+        if len(self._users) > 0:
+            for user in self._users:
+                for mision in user.misiones:
+                    ranking.append((user, mision.estadisticas_mision()["Puntuacion final"], mision))
+        ranking.sort(key= lambda x : x[1], reverse=True)
+        self.top_globales = ranking
+        return
+    

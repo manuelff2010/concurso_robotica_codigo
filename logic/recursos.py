@@ -13,8 +13,19 @@ class Recursos:
         return self._valores[nombre]
 
     def modificar(self, nombre, cambio):
+        if self._valores[nombre] + cambio < 0:
+            self._valores[nombre] = 0
+            return
         self._valores[nombre] = self._valores[nombre] + cambio 
 
+    def historial_data(self):
+        estados = self.estados()
+        texto = ""
+        for recurso, valor in self._valores.items():
+            longitud = 16 - len(recurso)
+            text = f"   {recurso} " + " "*longitud + f"| {valor}, {estados[recurso]} \n"
+            texto += text
+        return texto
     def estados(self):
         resultado = {}
         for recurso, valor in self._valores.items():
@@ -50,3 +61,10 @@ class Recursos:
         else:
             return "OPERATIVO"
         
+    def to_dict(self):
+        return {"_valores": self._valores}
+
+    @classmethod
+    def from_dict(cls, data):
+        if not data: return None
+        return cls(data["_valores"])

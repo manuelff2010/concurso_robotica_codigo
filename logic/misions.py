@@ -3,24 +3,41 @@ import random as rd
 
 class Mision():
     
-    def __init__(self, nombre: str, descripcion: str, type: str):
-        self.type = type
+    def __init__(self, nombre: str, descripcion: str, type: str, dificultad: int = 1):
         self.nombre = nombre
-        self.estado = "INICIALIZADO"
         self.descripcion = descripcion
+        self.type = type
+        self.estado = "INICIALIZADO"
         self.puntuacion = 0
         self.turno = 0
+        self.dificultad = dificultad
+        self.partida_finalizada = False
         self.eventos_procesados = 0
         self.eventos_mal_seleccionado = 0
         self.historial = []
+        self.recursos_iniciales = {}
         self.historial.append(f"mision {self.nombre} inicializada")
         self.historial.append(f"mision: {self.descripcion}")
     
     def sources_init(self, recursoso_iniciales: dict):
         self.recursos = recursos.Recursos(recursoso_iniciales)
-        self.historial.append(f"recursos iniciales: ")
+        self.recursos_iniciales = recursoso_iniciales.copy()
+        self.historial.append(f"recursos iniciales: \n")
         for nombre in self.recursos.estados().keys():
             self.historial.append(f"{nombre}: {self.recursos.obtener(nombre)}")
+
+    def porcentaje(self, recurso):
+        inicial = self.recursos_iniciales.get(recurso, 0)
+        if inicial <= 0:
+            return None
+        return round((self.recursos.obtener(recurso) / inicial) * 100, 2)
+
+    def estado_recurso(self, recurso):
+        valor = self.recursos.obtener(recurso)
+        porcentaje = self.porcentaje(recurso)
+        if porcentaje is None:
+            return str(valor)
+        return f"{valor} ({porcentaje}%)"
     
     def modify_puntuacion(self,valor):
         self.historial.append(f"Se actualiza puntuacion de {self.puntuacion}, a {self.puntuacion + valor}")
@@ -37,6 +54,67 @@ class Mision():
         }
         for recurso, valor in recursos_per_tourn.items():
             self.recursos.modificar(recurso, valor)
+
+    def estadisticas_mision(self):
+        eventos_bien = self.eventos_procesados - self.eventos_mal_seleccionado
+        return {
+                    "Eventos procesados": self.eventos_procesados,
+                    "Decisiones correctas": eventos_bien,
+                    "Decisiones incorrectas": self.eventos_mal_seleccionado,
+                    "Energia restante": self.estado_recurso("energia"),
+                    "Agua restante": self.estado_recurso("agua"),
+                    "Alimento restante": self.estado_recurso("alimento"),
+                    "Comunicaciones restantes": self.estado_recurso("comunicaciones"),
+                    "Oxigeno restante": self.estado_recurso("oxigeno"),
+                    "Aceptacion restante": self.estado_recurso("aceptacion"),
+                    "Puntuacion final": self.puntuacion,
+                    "Indice de eficiencia": round((eventos_bien / self.eventos_procesados) * 100, 2) if self.eventos_procesados > 0 else 0,
+                    "Estado final": self.estado 
+                }
+
+    def to_dict(self):
+        return {
+            "nombre": self.nombre,
+            "descripcion": self.descripcion,
+            "type": self.type,
+            "estado": self.estado,
+            "puntuacion": self.puntuacion,
+            "turno": self.turno,
+            "dificultad": self.dificultad,
+            "eventos_procesados": self.eventos_procesados,
+            "eventos_mal_seleccionado": self.eventos_mal_seleccionado,
+            "historial": self.historial,
+            "recursos": self.recursos.to_dict() if self.recursos else None,
+            "recursos_iniciales": self.recursos_iniciales,
+            "partida_finalizada": self.partida_finalizada
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        if not data: return None
+        mision = cls(data["nombre"], data["descripcion"], data["type"])
+        mision.estado = data["estado"]
+        mision.puntuacion = data["puntuacion"]
+        mision.turno = data["turno"]
+        mision.dificultad = data["dificultad"]
+        mision.eventos_procesados = data["eventos_procesados"]
+        mision.eventos_mal_seleccionado = data["eventos_mal_seleccionado"]
+        mision.historial = data["historial"]
+        mision.recursos = recursos.Recursos.from_dict(data["recursos"])
+        mision.recursos_iniciales = data.get("recursos_iniciales") or {}
+        mision.partida_finalizada = data["partida_finalizada"]
+        return mision
+
+
+def generar_recursos_aleatorios() -> dict:
+    return {
+        "agua": rd.randrange(30, 91),
+        "alimento": rd.randrange(30, 91),
+        "energia": rd.randrange(20, 91),
+        "comunicaciones": rd.randrange(20, 91),
+        "oxigeno": rd.randrange(40, 96),
+        "aceptacion": rd.randrange(30, 81),
+    }
 
 
 misiones_predefinidas = [
@@ -112,13 +190,7 @@ misiones_predefinidas = [
     {
             "nombre": "Random generate",
             "descripcion": "Partida inicializada con recursos aleatorios",
-            "recursos": {
-                "agua": rd.randrange(30, 91),
-                "alimento": rd.randrange(30, 91),
-                "energia": rd.randrange(20, 91),
-                "comunicaciones": rd.randrange(20, 91),
-                "oxigeno": rd.randrange(40, 96),
-                "aceptacion": rd.randrange(30, 81),
-            },
+            "aleatorio": True,
+            "recursos": generar_recursos_aleatorios(),
         }
 ]
