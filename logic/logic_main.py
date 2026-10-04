@@ -105,20 +105,22 @@ class logic_app:
             self.data_saver.guardar_partida(self._users)
   
     def execute_simulation(self):
-        if self.active_mision.estado == "FINALIZADA" or self.active_mision.estado == "AGOTADO":
-            return "partida finalizada"
+        if self.active_mision.partida_finalizada:
+            return
         if len(self.eventos) > 0:
             self.data_saver.guardar_partida(self._users)
             return "aun hay eventos por responder"
+        if self.active_mision.recursos.estado_general() == "AGOTADO" or self.active_mision.estado == "AGOTADO":
+                    self.active_mision.estado = "FALLIDA"
+                    self.active_mision.partida_finalizada = True
+                    self.data_saver.guardar_partida(self._users)
+                    self.active_mision.historial.append(f"mision {self.active_mision.nombre} finalizada")
+                    return "partida finalizada"
         if self.active_mision.turno == self.turnos_por_mision:
             self.active_mision.estado = "COMPLETADA"
             self.active_mision.partida_finalizada = True
             self.data_saver.guardar_partida(self._users)
-            return "partida finalizada"
-        if self.active_mision.recursos.estado_general() == "AGOTADO":
-            self.active_mision.estado = "FALLIDA"
-            self.active_mision.partida_finalizada = True
-            self.data_saver.guardar_partida(self._users)
+            self.active_mision.historial.append(f"mision {self.active_mision.nombre} finalizada")
             return "partida finalizada"
         self.generate_event()
         self.active_mision.sources_turno()

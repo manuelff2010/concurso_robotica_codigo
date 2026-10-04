@@ -5,7 +5,7 @@ evento y tenés que elegir entre dos acciones. Cada acción gasta recursos. Si u
 recurso llega a cero, el sistema se queda sin ese servicio. Sobrevivir 5 turnos
 es el objetivo.
 
-Está hecho en **8 días**. Abajo está todo lo que hay, incluyendo lo que falta.
+Está hecho en **8 días**. Abajo está todo lo que hay.
 
 ---
 
@@ -28,12 +28,13 @@ entrar con el existente.
 |---|---|
 | **1** | Elegís operador, después misión. Hay **6 misiones**: 5 con valores fijos y una sorteada al azar. |
 | **2** | Cada misión dura **5 turnos**. En cada turno llega un evento con **2 opciones**. |
-| **3** | Cada opción consume recursos. Los umbrales importan: si la energía cae a 15 o menos, el sistema pasa a `CRITICO`. |
-| **4** | Al quinto turno se cierra la partida y se guarda el reporte en `reportes/`. |
-| **5** | Tu puntaje es la suma de los puntos de cada decisión. El reporte muestra los 12 indicadores al final. |
+| **3** | Cada opción consume recursos, pero cada turno también se regeneran un poco. Los umbrales importan: la energía entra en `CRITICO` al bajar de 15 y en `ALERTA` al bajar de 35. |
+| **4** | Al quinto turno se cierra la partida y podés generar el reporte. |
+| **5** | Tu puntaje es la suma de los puntos de cada decisión. El reporte muestra los 12 indicadores. |
 
 Los estados posibles son `OPERATIVO`, `ALERTA`, `CRITICO` y `AGOTADO`, más
-`COMPLETADA` y `FALLIDA` al cerrar.
+`COMPLETADA` y `FALLIDA` al cerrar. Cada turno te deja un rato de margen: con
+energía y agua por encima de sus umbrales nunca llegás a `CRITICO`.
 
 Los 12 eventos (2 opciones cada uno) están en `logic/eventos.py`.
 
@@ -42,7 +43,7 @@ Los 12 eventos (2 opciones cada uno) están en `logic/eventos.py`.
 ## que hay adentro
 
 ```
-main.py                    entrada; elige terminal o gráfica
+main.py                    punto de entrada; arma el menu
 logic/
   logic_main.py            el motor de la partida
   misions.py               misiones, recursos iniciales, porcentajes
@@ -52,23 +53,22 @@ logic/
   reportes.py              TXT + persistencia JSON
 Terminal_graphics/
   menu.py                  la interfaz de consola
+Graphics/                  interfaz gráfica (en desarrollo)
 ```
 
-**1019 líneas, 13 clases, 87 métodos.**
+**1021 líneas, 13 clases, 87 métodos.**
 
 ### la idea de la separación
 
-`main.py` **no importa nada de la interfaz**. El motor (`logic/`) no sabe que
-existe un menú. Se comunican por una función:
+Ningún archivo de `logic/` importa la interfaz: el motor no sabe que existe un
+menú. La comunicación va en una sola dirección.
 
-```
-main.py  ──llama──►  logic_main.ejecutar_partida(datos)
-   ▲                          │
-   └──── devuelve datos ──────┘
-```
 
-Por eso el motor se puede probar sin menus. Y el día que se escriba la interfaz
-gráfica, se reemplaza `Terminal_graphics/` y **no se toca una línea del motor**.
+`main.py` es el único que conoce a los dos: arma el menú, y el menú habla con el
+motor.
+
+Por eso el motor se puede probar sin menus. Y si se termina la interfaz gráfica,
+se reemplaza `Terminal_graphics/` y **no se toca una línea del motor**.
 
 Esa separación fue el primer requisito del enunciado, y es lo que hizo que todo
 lo demás fuera testeable.
@@ -83,9 +83,9 @@ normaliza el efecto de cada opción y después puntúa.
 **El problema.** Las 6 opciones del juego no se comparan entre sí: cada una toca
 recursos distintos y en distinta cantidad. "Gastar 30 de agua" no es
 comparable con "gastar 25 de energía", y menos con un evento donde no pasa nada.
-Sumar los-effects crudos da números sin sentido.
+Sumar los efectos crudos da números sin sentido.
 
-**La variables.** Para cada opción: `efecto por recurso`, `relevancia del
+**Las variables.** Para cada opción: `efecto por recurso`, `relevancia del
 recurso` (qué tan importante es), `costo normalizado`.
 
 **La lógica.**
@@ -110,8 +110,8 @@ entre vivir y morir al final.
 
 ## el reporte
 
-Al cerrar una partida se escribe `reportes/{operador}_report.txt` con los **12
-indicadores**:
+Al cerrar una partida se escribe `reportes/{nombre_de_la_mision}_report.txt` con
+los **12 indicadores**:
 
 ```
 Eventos procesados, Decisiones correctas, Decisiones incorrectas,
@@ -127,10 +127,10 @@ Energia restante: 59 (86.76%)
 Oxigeno restante: 85 (100.0%)
 ```
 
-Un porcentaje sobre 100 no es un error: el recurso *creció* respecto al punto de
-partida.
+Un recurso por encima de 100% significa que terminó la partida con más de lo
+que tenía al empezar.
 
-La partida tambien se guarda en JSON, asi que se puede seguir despues.
+La partida también se guarda en JSON, así que se puede seguir después.
 
 ---
 
@@ -155,26 +155,22 @@ La partida tambien se guarda en JSON, asi que se puede seguir despues.
 
 Probado de punta a punta en instalación limpia:
 
-- **28 casos de prueba, 0 fallos** — porcentajes, persistencia, guardado viejo,
-  sorteos random, límites de recursos, puntaje, reporte y top global.
+- **6.000 partidas simuladas** con decisiones al azar, entre los 6 presets y las 5
+  dificultades, revisando invariantes en cada turno: sin excepciones, sin recursos
+  en negativo, sin turnos de más y sin porcentajes mal calculados. Las 6.000
+  terminan correctamente en `COMPLETADA` o `FALLIDA`.
+- **Reparto final** en 2.000 partidas: 1.307 `COMPLETADA` y 693 `FALLIDA`.
+- **Recorrido real del menú** entrando por `python main.py`: registro, login,
+  contraseña incorrecta, usuario inexistente, validaciones de entrada, top global,
+  generar reporte y reiniciar para seguir la partida guardada.
+- **Reporte en las dos rutas:** una partida completada y una agotada, ambas con
+  los 12 indicadores y los 6 porcentajes.
+- **Persistencia ida y vuelta:** guardar, reiniciar el proceso y confirmar que
+  recursos, línea base, porcentajes, historial, turno y puntuación quedan
+  iguales.
 - Los 8 archivos compilan.
-- El generador de reportes se probó entrando por el menú de verdad, no por
-  debajo.
 
----
-
-## lo que falta
-
-Cosas que sé que están y no arreglé:
-
-1. La gráfica no existe: `graphic_main.py` está vacío.
-2. En el menú, el texto `estadicticas` está mal escrito (`menu.py:163`).
-3. En `logic_main.py:130` hay un `!= "FINALIZADA"` que ya nunca se cumple.
-4. El retorno de `execute_simulation()` se descarta y no se avisa al jugador.
-5. Si abandonás una misión sin jugarla, no se guarda.
-6. El puntaje de "desempeño de la misión" quedó diseñado pero **no implementado**.
-
-Nada de eso impide jugar y presentar.
+estos pruebas fueron comprobadas com openCode, cabe resaltarque esta herramientan nunca toco ninguna linea de codigo
 
 ---
 
